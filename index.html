@@ -429,23 +429,56 @@ $('btnGuide').addEventListener('click',function(){
   m.innerHTML='<div class="act-modal-h"><h3>📖 くろぬりんの使い方</h3><button class="modal-close" id="guideClose">✕</button></div>'
     +'<div class="act-modal-body" style="font-size:12px;line-height:1.8;color:var(--tx);">'
     +'<p style="color:var(--txm);margin-bottom:14px;">くろぬりんは、PDFの墨消し・分割・結合・テキストスタンプ・印刷をブラウザだけで完結するツールです。データは外部に送信されません。</p>'
+
     +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">📄 ファイル読み込み</h4>'
-    +'<p>画面全体にPDFをドラッグ＆ドロップ、または「📁 ファイル追加」ボタンから開きます。<strong>複数ファイルを一度に追加可能</strong>で、各PDFが個別のセグメントカードになります。</p>'
-    +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">✂ セグメント操作（分割・結合）</h4>'
-    +'<p><strong>ページの移動：</strong>サムネイルをドラッグして別のセグメントにドロップ。サムネイル間の青い線にドロップすると位置指定で挿入されます。</p>'
+    +'<p>画面全体にPDFをドラッグ＆ドロップ、または「📁 ファイル追加」ボタンから開きます。<strong>複数ファイルを一度に追加可能</strong>で、各PDFが個別のセグメントカードになります。後から追加のファイルをドロップすることもできます。</p>'
+
+    +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">✂ セグメント操作（分割・結合・並び替え）</h4>'
+    +'<p><strong>ページの移動：</strong>サムネイルをドラッグして別のセグメントにドロップ。サムネイル間の青い線にドロップすると位置指定で挿入。</p>'
+    +'<p><strong>複数ページ選択：</strong>Ctrl+クリックで個別選択、Shift+クリックで範囲選択。選択したページをまとめてドラッグ移動できます。</p>'
     +'<p><strong>新しいセグメント：</strong>ページをドラッグしてセグメント間の「＋」ゾーンにドロップ。</p>'
-    +'<p><strong>セグメント結合：</strong>⠿グリップをドラッグして別セグメントにドロップ、または「🔗 次と結合」リンク。</p>'
+    +'<p><strong>セグメント結合：</strong>⠿グリップをドラッグして別セグメントにドロップ、または「🔗 次と結合」リンク。左サイドバーの「全結合」ボタンで全セグメントを1つにまとめることもできます。</p>'
     +'<p><strong>セグメント分割：</strong>✂ボタンでページ位置を指定して2つに分割。</p>'
+    +'<p><strong>セグメント名の変更：</strong>カードのタイトル欄をクリックして直接編集。出力ファイル名に反映されます。</p>'
+    +'<p><strong>セグメント削除：</strong>🗑ボタンでセグメントごと削除。</p>'
+
     +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">📝 墨消し（リダクション）</h4>'
-    +'<p>セグメントの🖊ボタンまたは<strong>サムネイルをダブルクリック</strong>でモーダルが開きます。マウスドラッグ（スマホはタッチ）で黒塗り範囲を描画。出力時に黒塗り矩形で覆い、下のテキストデータも削除します。墨消し以外のページはベクター維持。</p>'
+    +'<p>セグメントの🖊ボタンまたは<strong>サムネイルをダブルクリック</strong>でモーダルが開きます。</p>'
+    +'<p><strong>黒塗り範囲の描画：</strong>マウスドラッグ（スマホはタッチ）で範囲を選択。複数箇所を指定可能。</p>'
+    +'<p><strong>矩形の操作：</strong>描いた矩形はドラッグで移動、✕ボタンまたは「🗑全削除」で削除。</p>'
+    +'<p><strong>色の変更：</strong>ツールバーで黒・白・グレーを選択可能。</p>'
+    +'<p><strong>ズーム：</strong>＋/−ボタンで拡大・縮小（25%〜300%）。</p>'
+    +'<p><strong>ページ移動：</strong>◀前 / 次▶ ボタンでセグメント内のページを切り替え。</p>'
+    +'<p>出力時に黒塗り矩形で覆い、下のテキストデータも削除します。墨消し以外のページはベクター維持。黒塗り済みのページはサムネイルにも反映されます。</p>'
+
     +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">📌 テキストスタンプ</h4>'
-    +'<p>墨消しモーダル内の「📌 スタンプ配置」で文言をPDF上に配置。ドラッグで移動、クリック選択後にBackspace/Deleteで削除。フォントサイズはモーダル内のプルダウンで変更可能。</p>'
-    +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">▶ 処理を実行</h4>'
+    +'<p>墨消しモーダル内の「📌 スタンプ配置」で文言をPDF右下に配置。ドラッグで自由に移動。フォントサイズはモーダル内のプルダウンで変更可能（8pt〜18pt）。</p>'
+    +'<p>クリックで選択状態にしてBackspace/Deleteキーで削除。✕ボタンでも削除可能。</p>'
+    +'<p>スタンプの文言は左サイドバーの「テキストスタンプ」欄で自由に編集できます。</p>'
+
+    +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">▶ 処理を実行（出力）</h4>'
     +'<p>「▶ 処理を実行」ボタンで出力ダイアログが開きます。セグメントごとにダウンロード・印刷を選択でき、複数セグメントの場合はZIP一括ダウンロードや全体印刷も可能。</p>'
+    +'<p>各セグメントカードの🖨ボタンからも直接印刷できます。</p>'
+
+    +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">⚙ 設定（左サイドバー）</h4>'
+    +'<p><strong>画質：</strong>標準（300dpi）/ 高画質（600dpi）/ 最高画質（900dpi）</p>'
+    +'<p><strong>プロパティ削除：</strong>ONでPDFの作成者・タイトル等のメタデータを除去</p>'
+    +'<p><strong>リダクション：</strong>ONで黒塗り部分のテキストデータも物理的に削除（推奨ON）</p>'
+
+    +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">🔄 リセット・戻す</h4>'
+    +'<p><strong>↩ 一つ前に戻す：</strong>セグメント操作（移動・分割・結合）を1つ戻します。</p>'
+    +'<p><strong>🔄 セグメントをリセット：</strong>セグメント構成をファイルごとに1つずつの初期状態に戻します。</p>'
+    +'<p><strong>🔄 全てリセット：</strong>読み込んだPDF・墨消し・スタンプをすべてクリアします。</p>'
+
+    +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">📱 スマートフォン対応</h4>'
+    +'<p>左上の☰ボタンでサイドバーを開閉。墨消しはタッチドラッグで操作可能。右下の緑の▶ボタン（FAB）から処理を実行できます。</p>'
+
     +'<h4 style="font-size:13px;margin:16px 0 6px;color:var(--blue);">⌨ ショートカット</h4>'
-    +'<p><kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Ctrl+Z</kbd> 元に戻す　'
-    +'<kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Ctrl+Y</kbd> やり直し　'
-    +'<kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Backspace</kbd> スタンプ削除</p>'
+    +'<p><kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Ctrl+Z</kbd> 元に戻す（墨消しモーダル内：矩形操作 / メイン画面：セグメント操作）</p>'
+    +'<p><kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Ctrl+Y</kbd> やり直し</p>'
+    +'<p><kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Backspace</kbd> / <kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Delete</kbd> スタンプ削除（選択中のみ）</p>'
+    +'<p><kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Ctrl+クリック</kbd> ページ個別選択 / <kbd style="background:var(--bg);border:1px solid var(--bd);border-radius:3px;padding:1px 5px;font-size:11px;">Shift+クリック</kbd> 範囲選択</p>'
+
     +'<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--bd);text-align:center;font-size:11px;color:var(--txl);">くろぬりん v1.0 — ブラウザ内完結・データ送信なし</div>'
     +'</div>';
   bg.appendChild(m);document.body.appendChild(bg);
@@ -976,6 +1009,18 @@ document.addEventListener('click',function(e){
 });
 // Keyboard delete for selected stamp
 document.addEventListener('keydown',function(e){
+  // Ctrl+Z / Ctrl+Y for undo/redo
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){
+    e.preventDefault();
+    if(RM.open){undoRect();}else{undoSeg();}
+    return;
+  }
+  if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.key==='z'&&e.shiftKey))){
+    e.preventDefault();
+    if(RM.open){redoRect();}
+    return;
+  }
+  // Backspace/Delete for stamp
   if(!selectedStampId||!RM.open)return;
   if(e.key==='Backspace'||e.key==='Delete'){
     e.preventDefault();
