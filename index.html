@@ -271,6 +271,11 @@ input[type=file]{display:none;}
           <option value="14" selected>14pt</option>
         </select>
       </div>
+      <div style="display:flex;gap:4px;margin-top:6px;">
+        <button class="s-btn out" id="stampSave" style="padding:6px;font-size:11px;flex:1;">💾 登録</button>
+        <button class="s-btn out" id="stampReset" style="padding:6px;font-size:11px;flex:1;color:var(--txl);">↩ 初期値に戻す</button>
+      </div>
+      <div id="stampSaved" style="font-size:10px;color:var(--green);margin-top:4px;display:none;">✅ 保存しました（次回も自動で反映されます）</div>
       <div style="font-size:10px;color:var(--txl);margin-top:4px;">墨消しモーダル内の「📌スタンプ配置」で使用</div>
     </div>
     <div style="flex:1"></div>
@@ -312,6 +317,34 @@ var S={
   sel:[]// selected page items [{si,ti,pg}]
 };
 function nextPageId(){return++S.pageIdCounter;}
+
+// STAMP PERSISTENCE (localStorage)
+var STAMP_KEY='kuronurin_stamp_text';
+var STAMP_SIZE_KEY='kuronurin_stamp_size';
+var STAMP_DEFAULT="上記は原本に相違ない\n○○県○○市○○町１丁目２番３号\n司法書士　○○○○";
+(function loadStamp(){
+  try{
+    var saved=localStorage.getItem(STAMP_KEY);
+    if(saved!==null)$('stampText').value=saved;
+    var savedSize=localStorage.getItem(STAMP_SIZE_KEY);
+    if(savedSize){
+      var sel=$('stampSize');
+      for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===savedSize){sel.selectedIndex=i;break;}}
+    }
+  }catch(e){}
+})();
+$('stampSave').addEventListener('click',function(){
+  try{
+    localStorage.setItem(STAMP_KEY,$('stampText').value);
+    localStorage.setItem(STAMP_SIZE_KEY,$('stampSize').value);
+    var msg=$('stampSaved');msg.style.display='block';setTimeout(function(){msg.style.display='none';},2500);
+  }catch(e){alert('保存に失敗しました。ブラウザのプライベートモードでは保存できません。');}
+});
+$('stampReset').addEventListener('click',function(){
+  $('stampText').value=STAMP_DEFAULT;
+  $('stampSize').selectedIndex=3;// 14pt
+  try{localStorage.removeItem(STAMP_KEY);localStorage.removeItem(STAMP_SIZE_KEY);}catch(e){}
+});
 
 // MOBILE SIDEBAR
 function toggleSide(){var sb=$('sidebar'),ov=$('sideOverlay');sb.classList.toggle('open');ov.classList.toggle('show');}
