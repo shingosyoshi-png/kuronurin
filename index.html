@@ -102,6 +102,12 @@ body{font-family:var(--ff);background:var(--bg);color:var(--tx);min-height:100vh
 .seg-th canvas{width:100%;display:block;}
 .seg-th .tn{position:absolute;bottom:0;left:0;right:0;background:rgba(74,55,40,.5);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;display:flex;justify-content:space-between;backdrop-filter:blur(2px);}
 .seg-th .tn .pg{opacity:.7;font-size:9px;}
+.th-copy{position:absolute;top:3px;left:3px;width:22px;height:22px;background:var(--bg2);color:var(--txm);border:1.5px solid var(--bd);border-radius:6px;cursor:pointer;font-size:10px;display:none;align-items:center;justify-content:center;transition:.15s;padding:0;z-index:5;}
+.th-copy:hover{background:var(--blue-l);color:var(--blue);border-color:var(--blue-bd);transform:scale(1.1);}
+.seg-th:hover .th-copy{display:flex;}
+.th-rot{position:absolute;top:3px;left:30px;width:22px;height:22px;background:var(--bg2);color:var(--txm);border:1.5px solid var(--bd);border-radius:6px;cursor:pointer;font-size:11px;display:none;align-items:center;justify-content:center;transition:.15s;padding:0;z-index:5;font-weight:700;line-height:1;}
+.th-rot:hover{background:var(--green-l);color:var(--green);border-color:var(--green-bd);transform:scale(1.1) rotate(90deg);}
+.seg-th:hover .th-rot{display:flex;}
 .seg-f{padding:6px 14px;text-align:center;}
 .seg-link{font-size:12px;color:var(--txl);cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:.2s;background:none;border:none;font-family:var(--ff);font-weight:500;}
 .seg-link:hover{color:var(--pink);}
@@ -308,9 +314,10 @@ var segColors=['c0','c1','c2','c3','c4'];
 // STATE
 var S={
   files:{},// {fileId:{doc,bytes,name,tp}} - multiple PDF storage
-  thumbs:[],// [{canvas,pageId,fileId,localPage}]
+  thumbs:[],// [{canvas,pageId,fileId,localPage,baseW,baseH}]
   segs:[],
-  rects:{},// keyed by pageId
+  rects:{},// keyed by pageId (in current displayed/rotated space at scale 1.5)
+  rotations:{},// {pageId: 0|90|180|270} applied on top of source PDF
   hist:[],hi:-1,
   dpi:600,
   pageIdCounter:0,
@@ -410,7 +417,8 @@ function loadSingleFile(file){
             c.width=vp.width;c.height=vp.height;
             return page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise.then(function(){
               var pid=nextPageId();
-              return{pageId:pid,fileId:fileId,localPage:localPg,canvas:c};
+              // baseW/baseH = unrotated display dims at scale 1.5 (0.25 * 6 = 1.5)
+              return{pageId:pid,fileId:fileId,localPage:localPg,canvas:c,baseW:vp.width*6,baseH:vp.height*6};
             });
           }));
         })(i);
@@ -439,7 +447,7 @@ function getPageInfo(pageId){
 }
 
 // RESET
-$('resetAll').addEventListener('click',function(){if(!confirm('全てリセットしますか？'))return;S.files={};S.segs=[];S.rects={};S.thumbs=[];S.hist=[];S.hi=-1;S.pageIdCounter=0;S.sel=[];stamps={};$('fi').value='';render();});
+$('resetAll').addEventListener('click',function(){if(!confirm('全てリセットしますか？'))return;S.files={};S.segs=[];S.rects={};S.rotations={};S.thumbs=[];S.hist=[];S.hi=-1;S.pageIdCounter=0;S.sel=[];stamps={};$('fi').value='';render();});
 $('btnResetSeg').addEventListener('click',function(){
   if(S.thumbs.length===0)return;if(!confirm('セグメントをリセットしますか？（ファイルごとに1セグメントに戻します）'))return;
   // Rebuild segments: one per file
@@ -605,6 +613,23 @@ function render(){
       var tData=S.thumbs.find(function(x){return x.pageId===pg;});
       if(tData){var c2=document.createElement('canvas');c2.width=tData.canvas.width;c2.height=tData.canvas.height;c2.getContext('2d').drawImage(tData.canvas,0,0);th.appendChild(c2);}
       var badge=document.createElement('div');badge.className='sel-badge';badge.textContent='✓';th.appendChild(badge);
+      // Copy button
+      var cpBtn=document.createElement('button');cpBtn.className='th-copy';cpBtn.textContent='📋';cpBtn.title='このページをコピー';
+      cpBtn.addEventListener('click',function(e){
+        e.stopPropagation();e.preventDefault();
+        copyPage(pg,si,ti);
+      });
+      cpBtn.addEventListener('mousedown',function(e){e.stopPropagation();});
+      th.appendChild(cpBtn);
+      // Rotate button (90° CW; rotates all selected pages if this thumb is part of selection)
+      var rotBtn=document.createElement('button');rotBtn.className='th-rot';rotBtn.textContent='↻';rotBtn.title='90°回転';
+      rotBtn.addEventListener('click',function(e){
+        e.stopPropagation();e.preventDefault();
+        var pageIds=(isSel(si,ti)&&S.sel.length>1)?S.sel.map(function(s){return s.pg;}):[pg];
+        rotatePages(pageIds,'cw');
+      });
+      rotBtn.addEventListener('mousedown',function(e){e.stopPropagation();});
+      th.appendChild(rotBtn);
       var label=document.createElement('div');label.className='tn';
       var hasRedact=(S.rects[pg]||[]).length>0;
       var pi=getPageInfo(pg);
@@ -629,6 +654,7 @@ function render(){
       });
       // Drag
       th.addEventListener('dragstart',function(e){
+        if(e.target.classList&&(e.target.classList.contains('th-copy')||e.target.classList.contains('th-rot'))){e.preventDefault();return;}
         e.stopPropagation();
         var items;
         if(isSel(si,ti)&&S.sel.length>1){items=S.sel.slice();}
@@ -732,6 +758,110 @@ function hideDropZones(){document.querySelectorAll('.new-seg-drop,.drop-ind').fo
   document.querySelectorAll('.seg').forEach(function(el){el.classList.remove('seg-merge-target');});
 }
 
+// Copy (duplicate) a page within the same segment
+function copyPage(pageId,si,ti){
+  var info=getPageInfo(pageId);
+  if(!info)return;
+  var newPid=nextPageId();
+  var origThumb=S.thumbs.find(function(t){return t.pageId===pageId;});
+  if(origThumb){
+    var c=document.createElement('canvas');
+    c.width=origThumb.canvas.width;c.height=origThumb.canvas.height;
+    c.getContext('2d').drawImage(origThumb.canvas,0,0);
+    S.thumbs.push({pageId:newPid,fileId:info.fileId,localPage:info.localPage,canvas:c,baseW:origThumb.baseW,baseH:origThumb.baseH});
+  }
+  if(S.rects[pageId]&&S.rects[pageId].length>0){
+    S.rects[newPid]=JSON.parse(JSON.stringify(S.rects[pageId]));
+    S.rects[newPid].forEach(function(r){r.id=genId();});
+  }
+  if(stamps[pageId]&&stamps[pageId].length>0){
+    stamps[newPid]=JSON.parse(JSON.stringify(stamps[pageId]));
+    stamps[newPid].forEach(function(s){s.id=genId();});
+  }
+  // Copy rotation state too
+  if(S.rotations[pageId])S.rotations[newPid]=S.rotations[pageId];
+  S.segs[si].pages.splice(ti+1,0,newPid);
+  saveHist();render();
+}
+
+// ===== PAGE ROTATION =====
+// Rotate the thumbnail canvas for a page in-place (synchronous)
+function rotateThumbCanvas(pageId,direction){
+  var th=S.thumbs.find(function(t){return t.pageId===pageId;});
+  if(!th)return;
+  var src=th.canvas;
+  var c=document.createElement('canvas');
+  c.width=src.height;c.height=src.width;
+  var ctx=c.getContext('2d');
+  if(direction==='cw'){ctx.translate(c.width,0);ctx.rotate(Math.PI/2);}
+  else{ctx.translate(0,c.height);ctx.rotate(-Math.PI/2);}
+  ctx.drawImage(src,0,0);
+  th.canvas=c;
+}
+
+// Rotate one or more pages. direction: 'cw' or 'ccw'
+// Also rotates stored rects and stamps to stay consistent with the new orientation.
+function rotatePages(pageIds,direction){
+  if(!pageIds||pageIds.length===0)return;
+  pageIds.forEach(function(pg){
+    var th=S.thumbs.find(function(t){return t.pageId===pg;});
+    if(!th)return;
+    var oldRot=S.rotations[pg]||0;
+    var deltaDeg=direction==='cw'?90:-90;
+    var newRot=((oldRot+deltaDeg)%360+360)%360;
+    // Current displayed dims at scale 1.5 BEFORE rotation
+    var dispW,dispH;
+    if(oldRot===90||oldRot===270){dispW=th.baseH;dispH=th.baseW;}
+    else{dispW=th.baseW;dispH=th.baseH;}
+    // Rotate rects (stored in current display space)
+    var rects=S.rects[pg]||[];
+    rects.forEach(function(r){
+      var nx,ny,nw,nh;
+      if(direction==='cw'){
+        // (x,y,w,h) -> (H - y - h, x, h, w)
+        nx=dispH-r.y-r.h;ny=r.x;nw=r.h;nh=r.w;
+      }else{
+        // (x,y,w,h) -> (y, W - x - w, h, w)
+        nx=r.y;ny=dispW-r.x-r.w;nw=r.h;nh=r.w;
+      }
+      r.x=nx;r.y=ny;r.w=nw;r.h=nh;
+    });
+    // Rotate stamps (approximate bounding box transform)
+    var sts=stamps[pg]||[];
+    sts.forEach(function(st){
+      var lines=st.text.split('\n');
+      var sH=lines.length*st.size*1.4;
+      var sW=0;
+      lines.forEach(function(l){var w=l.length*st.size*0.7;if(w>sW)sW=w;});
+      var ox=st.x,oy=st.y;
+      var ndW,ndH;// new display dims after rotation
+      ndW=dispH;ndH=dispW;
+      if(direction==='cw'){
+        st.x=dispH-oy-sH;
+        st.y=ox;
+      }else{
+        st.x=oy;
+        st.y=dispW-ox-sW;
+      }
+      if(st.x<0)st.x=0;
+      if(st.y<0)st.y=0;
+      if(st.x+sW>ndW)st.x=Math.max(0,ndW-sW);
+      if(st.y+sH>ndH)st.y=Math.max(0,ndH-sH);
+    });
+    // Update rotation state
+    if(newRot===0)delete S.rotations[pg];
+    else S.rotations[pg]=newRot;
+    // Rotate thumbnail canvas in-place (synchronous, instant feedback)
+    rotateThumbCanvas(pg,direction);
+  });
+  saveHist();render();
+  // If a rotated page is currently open in the modal, re-render it
+  if(RM.open&&S.segs[RM.si]){
+    var curPg=S.segs[RM.si].pages[RM.cp-1];
+    if(pageIds.indexOf(curPg)>=0)renderRPage();
+  }
+}
+
 // Move page to specific position
 function movePageToPosition(fromSi,fromTi,toSi,toTi){
   var pg=S.segs[fromSi].pages[fromTi];
@@ -814,8 +944,20 @@ function splitSegDialog(si){
 }
 
 // HISTORY (segment-level)
-function saveHist(){var snap=JSON.parse(JSON.stringify(S.segs));S.hist=S.hist.slice(0,S.hi+1);S.hist.push(snap);S.hi=S.hist.length-1;}
-function undoSeg(){if(S.hi<=0)return;S.hi--;S.segs=JSON.parse(JSON.stringify(S.hist[S.hi]));render();}
+function saveHist(){
+  var snap={segs:JSON.parse(JSON.stringify(S.segs)),rotations:JSON.parse(JSON.stringify(S.rotations||{}))};
+  S.hist=S.hist.slice(0,S.hi+1);S.hist.push(snap);S.hi=S.hist.length-1;
+}
+function undoSeg(){
+  if(S.hi<=0)return;S.hi--;
+  var snap=S.hist[S.hi];
+  if(Array.isArray(snap)){S.segs=JSON.parse(JSON.stringify(snap));}
+  else{
+    S.segs=JSON.parse(JSON.stringify(snap.segs));
+    S.rotations=JSON.parse(JSON.stringify(snap.rotations||{}));
+  }
+  render();
+}
 
 // ===== REDACT MODAL =====
 var RM={open:false,si:-1,cp:1,zm:1,rc:'#000000',drawing:false,ds:null};
@@ -829,7 +971,7 @@ function openRedactModal(si){
   var bg=document.createElement('div');bg.className='modal-bg';bg.id='rmBg';
   var m=document.createElement('div');m.className='modal';
   m.innerHTML='<div class="modal-h"><h3>🖊 墨消し - '+seg.title+'</h3><button class="modal-close" id="rmClose">✕</button></div>'
-    +'<div class="modal-bar"><div class="r-g"><span style="font-size:11px;color:var(--txm);font-weight:600">色:</span><div class="csw on" style="background:#000" data-c="#000000"></div><div class="csw" style="background:#fff;border-color:#ccc" data-c="#FFFFFF"></div><div class="csw" style="background:#888" data-c="#888888"></div></div><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><div class="r-g"><button class="r-btn" id="rmUndo">↩</button><button class="r-btn" id="rmRedo">↪</button></div><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><div class="r-g"><button class="r-btn" id="rmZo">−</button><span id="rmZl" style="font-size:11px;min-width:34px;text-align:center;font-weight:600">100%</span><button class="r-btn" id="rmZi">＋</button></div><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><button class="r-btn red" id="rmClear">🗑 全削除</button><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><button class="r-btn" id="rmStamp" style="color:var(--blue);border-color:var(--blue);">📌 スタンプ配置</button><select id="rmStampSize" style="padding:3px 6px;border:1px solid var(--bd);border-radius:4px;font-size:11px;font-family:var(--ff);background:var(--bg2);color:var(--tx);margin-left:4px;"><option value="8">8pt</option><option value="10">10pt</option><option value="12">12pt</option><option value="14" selected>14pt</option><option value="16">16pt</option><option value="18">18pt</option></select></div>'
+    +'<div class="modal-bar"><div class="r-g"><span style="font-size:11px;color:var(--txm);font-weight:600">色:</span><div class="csw on" style="background:#000" data-c="#000000"></div><div class="csw" style="background:#fff;border-color:#ccc" data-c="#FFFFFF"></div><div class="csw" style="background:#888" data-c="#888888"></div></div><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><div class="r-g"><button class="r-btn" id="rmUndo">↩</button><button class="r-btn" id="rmRedo">↪</button></div><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><div class="r-g"><button class="r-btn" id="rmZo">−</button><span id="rmZl" style="font-size:11px;min-width:34px;text-align:center;font-weight:600">100%</span><button class="r-btn" id="rmZi">＋</button></div><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><div class="r-g"><button class="r-btn" id="rmRotL" title="左に90°回転">↺</button><button class="r-btn" id="rmRotR" title="右に90°回転">↻</button></div><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><button class="r-btn red" id="rmClear">🗑 全削除</button><div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div><button class="r-btn" id="rmStamp" style="color:var(--blue);border-color:var(--blue);">📌 スタンプ配置</button><select id="rmStampSize" style="padding:3px 6px;border:1px solid var(--bd);border-radius:4px;font-size:11px;font-family:var(--ff);background:var(--bg2);color:var(--tx);margin-left:4px;"><option value="8">8pt</option><option value="10">10pt</option><option value="12">12pt</option><option value="14" selected>14pt</option><option value="16">16pt</option><option value="18">18pt</option></select></div>'
     +'<div class="modal-canvas" id="rmWrap"><div class="pc" id="rmPc"><canvas id="rmCv"></canvas><div class="ov" id="rmOv"></div></div></div>'
     +'<div class="modal-foot"><div class="r-g"><button class="r-btn" id="rmPrev">◀ 前</button><span id="rmPg" style="font-size:12px;font-weight:600;min-width:60px;text-align:center">-</span><button class="r-btn" id="rmNext">次 ▶</button></div><span style="font-size:11px;color:var(--txm)" id="rmSt"></span><button class="s-btn blue" style="width:auto;padding:6px 16px;font-size:12px" id="rmDone">✓ 完了</button></div>';
   bg.appendChild(m);document.body.appendChild(bg);
@@ -841,6 +983,8 @@ function openRedactModal(si){
   $('rmZo').onclick=function(){RM.zm=Math.max(.25,RM.zm-.25);renderRPage();};
   $('rmPrev').onclick=function(){if(RM.cp>1){RM.cp--;renderRPage();}};
   $('rmNext').onclick=function(){var seg2=S.segs[RM.si];if(RM.cp<seg2.pages.length){RM.cp++;renderRPage();}};
+  $('rmRotL').onclick=function(){var pg=S.segs[RM.si].pages[RM.cp-1];rotatePages([pg],'ccw');};
+  $('rmRotR').onclick=function(){var pg=S.segs[RM.si].pages[RM.cp-1];rotatePages([pg],'cw');};
   $('rmClear').onclick=function(){var pg=S.segs[RM.si].pages[RM.cp-1];S.rects[pg]=[];saveRHist();renderRRects();updRSt();};
   // Stamp placement
   $('rmStamp').onclick=function(){
@@ -904,7 +1048,10 @@ function refreshThumb(pageId){
   var thumbScale=0.25;
   var displayScale=1.5;// scale used when drawing rects in modal (zoom=1)
   return info.file.doc.getPage(info.localPage).then(function(page){
-    var vp=page.getViewport({scale:thumbScale});
+    // Apply our rotation on top of intrinsic rotation
+    var userRot=S.rotations[pageId]||0;
+    var totalRot=(((page.rotate||0)+userRot)%360+360)%360;
+    var vp=page.getViewport({scale:thumbScale,rotation:totalRot});
     var c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
     var ctx=c.getContext('2d');
     return page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
@@ -940,7 +1087,11 @@ function renderRPage(){
   var info=getPageInfo(pgId);
   if(!info)return;
   info.file.doc.getPage(info.localPage).then(function(page){
-    var sc=1.5*RM.zm,vp=page.getViewport({scale:sc}),cv=$('rmCv');
+    var sc=1.5*RM.zm;
+    // Apply our rotation on top of the page's intrinsic rotation
+    var userRot=S.rotations[pgId]||0;
+    var totalRot=(((page.rotate||0)+userRot)%360+360)%360;
+    var vp=page.getViewport({scale:sc,rotation:totalRot}),cv=$('rmCv');
     cv.width=vp.width;cv.height=vp.height;
     page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise.then(function(){
       $('rmPc').style.width=vp.width+'px';$('rmPc').style.height=vp.height+'px';
@@ -1243,31 +1394,45 @@ function hybridExport(seg,dpi,removeMeta,doRedact){
         if(!info)return;// skip orphan pages
         var srcBytes=info.file.bytes;
         var localPg=info.localPage;
-        
+
         var rects=(S.rects[pgId]||[]);
         var hasRedact=rects.length>0;
-        
+        var pgStamps=stamps[pgId]||[];
+        var hasStamps=pgStamps.length>0;
+        var userRot=S.rotations[pgId]||0;
+
         return PD.load(srcBytes.slice()).then(function(src){
           return nd.copyPages(src,[localPg-1]).then(function(pages){
             var newPage=pages[0];
             nd.addPage(newPage);
-            
-            if(hasRedact&&doRedact){
-              var pageHeight=newPage.getHeight();
-              var pageWidth=newPage.getWidth();
-              
-              return pdfjsLib.getDocument({data:srcBytes.slice()}).promise.then(function(sd){
-                return sd.getPage(localPg).then(function(pdfPage){
-                  var displayVp=pdfPage.getViewport({scale:1.5});
-                  var scaleX=pageWidth/displayVp.width;
-                  var scaleY=pageHeight/displayVp.height;
-                  
-                  return pdfPage.getTextContent().then(function(textContent){
-                    var pdfRects=rects.map(function(r){
-                      var px=r.x*scaleX;var pw=r.w*scaleX;var ph=r.h*scaleY;
-                      var py=pageHeight-(r.y*scaleY)-ph;
-                      return{x:px,y:py,w:pw,h:ph,x2:px+pw,y2:py+ph,color:r.color};
-                    });
+
+            // Apply user rotation on top of source rotation
+            if(userRot!==0){
+              var srcAngle=0;
+              try{srcAngle=newPage.getRotation().angle||0;}catch(e){}
+              newPage.setRotation(PDFLib.degrees(((srcAngle+userRot)%360+360)%360));
+            }
+
+            if(!hasRedact&&!hasStamps)return;// nothing to draw
+
+            return pdfjsLib.getDocument({data:srcBytes.slice()}).promise.then(function(sd){
+              return sd.getPage(localPg).then(function(pdfPage){
+                // The rects/stamps are stored in the viewport space used by the modal
+                // (scale 1.5 + user rotation on top of intrinsic). Build the same viewport.
+                var totalRot=(((pdfPage.rotate||0)+userRot)%360+360)%360;
+                var displayVp=pdfPage.getViewport({scale:1.5,rotation:totalRot});
+                // Convert display rect -> unrotated PDF content coords via convertToPdfPoint
+                var pdfRects=rects.map(function(r){
+                  var p1=displayVp.convertToPdfPoint(r.x,r.y);
+                  var p2=displayVp.convertToPdfPoint(r.x+r.w,r.y+r.h);
+                  var minX=Math.min(p1[0],p2[0]),maxX=Math.max(p1[0],p2[0]);
+                  var minY=Math.min(p1[1],p2[1]),maxY=Math.max(p1[1],p2[1]);
+                  return{x:minX,y:minY,w:maxX-minX,h:maxY-minY,x2:maxX,y2:maxY,color:r.color};
+                });
+
+                var rectPromise;
+                if(hasRedact&&doRedact){
+                  rectPromise=pdfPage.getTextContent().then(function(textContent){
                     textContent.items.forEach(function(item){
                       if(!item.transform||item.str.trim()==='')return;
                       var tx=item.transform[4],ty=item.transform[5],tw=item.width,th=item.height||Math.abs(item.transform[3]);
@@ -1282,23 +1447,21 @@ function hybridExport(seg,dpi,removeMeta,doRedact){
                     pdfRects.forEach(function(rect){
                       newPage.drawRectangle({x:rect.x,y:rect.y,width:rect.w,height:rect.h,color:parseColorRGB(rect.color),borderWidth:0});
                     });
-                    return drawStampsOnPage(nd,newPage,pgId,scaleX,scaleY,pageHeight);
                   });
+                }else if(hasRedact){
+                  // Draw rects without text deletion
+                  pdfRects.forEach(function(rect){
+                    newPage.drawRectangle({x:rect.x,y:rect.y,width:rect.w,height:rect.h,color:parseColorRGB(rect.color),borderWidth:0});
+                  });
+                  rectPromise=Promise.resolve();
+                }else{
+                  rectPromise=Promise.resolve();
+                }
+                return rectPromise.then(function(){
+                  if(hasStamps)return drawStampsOnPage(nd,newPage,pgId,displayVp,userRot);
                 });
               });
-            } else {
-              // Check for stamps even without redaction
-              var pgStamps=stamps[pgId]||[];
-              if(pgStamps.length>0){
-                var pageHeight2=newPage.getHeight();var pageWidth2=newPage.getWidth();
-                return pdfjsLib.getDocument({data:srcBytes.slice()}).promise.then(function(sd2){
-                  return sd2.getPage(localPg).then(function(pdfPage2){
-                    var displayVp2=pdfPage2.getViewport({scale:1.5});
-                    return drawStampsOnPage(nd,newPage,pgId,pageWidth2/displayVp2.width,pageHeight2/displayVp2.height,pageHeight2);
-                  });
-                });
-              }
-            }
+            });
           });
         });
       });
@@ -1319,43 +1482,34 @@ function parseColorRGB(hex){
   return PDFLib.rgb(parseInt(hex.substring(0,2),16)/255,parseInt(hex.substring(2,4),16)/255,parseInt(hex.substring(4,6),16)/255);
 }
 
-// Draw stamps on a PDF page
-function drawStampsOnPage(pdfDoc,page,pg,scaleX,scaleY,pageHeight){
+// Draw stamps on a PDF page. displayVp is the pdf.js viewport used in the modal
+// (scale 1.5 with the same rotation applied to the page). userRot is the user-applied
+// rotation delta (0/90/180/270), which we also use for the underlying text rotation
+// so stamps appear upright after the page's /Rotate is applied by viewers.
+function drawStampsOnPage(pdfDoc,page,pg,displayVp,userRot){
   var pgStamps=stamps[pg]||[];
   if(pgStamps.length===0)return Promise.resolve();
-  
-  // For Japanese text, we need to use a font that supports it
-  // pdf-lib's standard fonts don't support Japanese
-  // We'll fetch a Japanese font from Google Fonts CDN
+
   return fetchJapaneseFont().then(function(fontBytes){
-    var font=pdfDoc.embedFont(fontBytes,{subset:true});
-    return font;
+    return pdfDoc.embedFont(fontBytes,{subset:true});
   }).then(function(font){
     pgStamps.forEach(function(st){
-      var pdfX=st.x*scaleX;
       var lines=st.text.split('\n');
       var lineHeight=st.size*1.4;
       lines.forEach(function(line,li){
-        // st.y is top-left in canvas coords; convert to PDF bottom-left
-        // Each line starts at st.y + fontSize + li*lineHeight in canvas (top-down)
-        var canvasY=st.y+st.size+(li*lineHeight);
-        var pdfY=pageHeight-(canvasY*scaleY);
+        // Baseline-left of this line in display (viewport) coordinates
+        var dispBX=st.x;
+        var dispBY=st.y+st.size+(li*lineHeight);
+        // Convert to unrotated PDF content coords (bottom-up)
+        var pt=displayVp.convertToPdfPoint(dispBX,dispBY);
         page.drawText(line,{
-          x:pdfX,y:pdfY,size:st.size,font:font,color:PDFLib.rgb(0,0,0)
+          x:pt[0],y:pt[1],size:st.size,font:font,color:PDFLib.rgb(0,0,0),
+          rotate:PDFLib.degrees(userRot||0)
         });
       });
     });
   }).catch(function(err){
     console.warn('Font embed failed, using fallback:',err);
-    // Fallback: use Helvetica (won't render Japanese but at least won't crash)
-    pgStamps.forEach(function(st){
-      var pdfX=st.x*scaleX;
-      var pdfY=pageHeight-(st.y*scaleY)-(st.size*scaleY);
-      // Draw a visible marker rectangle instead
-      var lines=st.text.split('\n');
-      var w=150*scaleX,h=lines.length*st.size*1.4*scaleY;
-      page.drawRectangle({x:pdfX,y:pdfY-h+st.size*scaleY,width:w,height:h,color:PDFLib.rgb(1,1,1),borderColor:PDFLib.rgb(0,0,0),borderWidth:0.5});
-    });
   });
 }
 
