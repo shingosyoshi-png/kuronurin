@@ -27,6 +27,7 @@
     <button class="tab" data-tab="merge"><b>結合</b><span>複数PDFをまとめる</span></button>
     <button class="tab" data-tab="rename"><b>リネーム</b><span>ファイル名を一括変更</span></button>
     <button class="tab" data-tab="sign"><b>電子署名</b><span>署名の付与と検証</span></button>
+    <button class="tab" data-tab="preflight"><b>点検</b><span>提出前のチェック</span></button>
   </nav>
 
   <main class="main">
@@ -214,6 +215,46 @@
           </div>
         </div>
         <div class="sig-result" id="sigResult"></div>
+      </div>
+    </section>
+
+    <!-- ================= 点検 ================= -->
+    <section class="pane" id="pane-preflight">
+      <div class="pane-side">
+        <div class="card">
+          <h2>提出前の点検</h2>
+          <p class="hint">
+            相手方に渡す前・オンライン申請に添付する前に、差し戻しの原因になりやすい点をまとめて確認します。
+            ファイルは書き換えません。
+          </p>
+          <button class="btn primary" id="btnPreflight">この文書を点検</button>
+          <button class="btn out" id="btnPreflightOpen">別のPDFを開いて点検</button>
+        </div>
+        <div class="card">
+          <h2>点検する内容</h2>
+          <ul class="check-list">
+            <li>フォントがすべて埋め込まれているか</li>
+            <li>パスワード保護がかかっていないか</li>
+            <li>注釈・フォームが残っていないか</li>
+            <li>添付ファイル・JavaScriptが紛れていないか</li>
+            <li>ページサイズが揃っているか</li>
+            <li>作成者などのメタデータが残っていないか</li>
+            <li>電子署名の有無と検証結果</li>
+          </ul>
+          <p class="hint">
+            ここでの判定は一般的な注意点です。提出先ごとの要件（署名形式・用紙・様式）は各提出先の案内で確認してください。
+          </p>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="body-head">
+          <span id="preflightDocName">ファイル未選択</span>
+          <span class="spacer"></span>
+          <span class="hint" id="preflightSummary"></span>
+        </div>
+        <div class="report" id="preflightReport">
+          <p class="empty">PDFを開いて「この文書を点検」を押してください</p>
+        </div>
       </div>
     </section>
 

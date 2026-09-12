@@ -69,6 +69,7 @@ app.whenReady().then(async () => {
 
       report.checks.boot = await evaluate(win, `(() => ({
         title: document.title,
+        tabs: Array.from(document.querySelectorAll('.tab')).map((t) => t.dataset.tab).join(','),
         hasKuroApi: typeof window.kuro === 'object',
         hasPdfLib: typeof window.PDFLib === 'object',
         hasPdfJs: typeof window.pdfjsLib === 'object',
@@ -123,7 +124,18 @@ app.whenReady().then(async () => {
         await wait(3000);
         const signText = $('sigResult').textContent;
 
-        return { opened, afterSplit, rotated, mergeRows, afterMerge, certText, signText };
+        // 提出前の点検
+        document.querySelector('.tab[data-tab="preflight"]').click();
+        await wait(500);
+        $('btnPreflight').click();
+        await wait(2500);
+        const preflight = {
+          verdictClass: (document.querySelector('#preflightReport .verdict') || {}).className || '',
+          cards: document.querySelectorAll('#preflightReport .chk-card').length,
+          text: $('preflightReport').textContent.slice(0, 400),
+        };
+
+        return { opened, afterSplit, rotated, mergeRows, afterMerge, certText, signText, preflight };
       })()`);
 
       report.checks.files = fs.readdirSync(workDir).sort();

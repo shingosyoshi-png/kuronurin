@@ -752,6 +752,79 @@
   }
 
   /* ---------------------------------------------------------------- *
+   * 提出前の点検
+   * ---------------------------------------------------------------- */
+
+  var LEVEL_LABEL = { ok: '問題なし', warn: '要確認', error: '要修正', info: '情報' };
+
+  async function runPreflight() {
+    var doc = requireActiveDoc();
+    var report = await window.kuro.preflight(doc.bytes);
+    renderPreflight(doc, report);
+
+    var verdict = report.summary.verdict;
+    toast(
+      verdict === 'ok'
+        ? '点検しました。問題は見つかりませんでした'
+        : '点検しました。要修正' + report.summary.errors + '件 / 要確認' + report.summary.warnings + '件',
+      verdict === 'error'
+    );
+  }
+
+  function renderPreflight(doc, report) {
+    var box = $('preflightReport');
+    box.innerHTML = '';
+
+    $('preflightDocName').textContent =
+      doc.name + '（' + report.summary.pageCount + 'ページ' + (doc.dirty ? ' / 未保存の編集あり' : '') + '）';
+    $('preflightSummary').textContent =
+      report.summary.fileSizeText + ' / PDF ' + report.summary.pdfVersion + ' / フォント' + report.summary.fontCount + '種類';
+
+    var verdict = document.createElement('div');
+    verdict.className = 'verdict ' + report.summary.verdict;
+    verdict.innerHTML =
+      '<span>' +
+      (report.summary.verdict === 'ok'
+        ? 'このまま提出できる状態です'
+        : report.summary.verdict === 'error'
+          ? '修正が必要な項目があります'
+          : '確認したほうがよい項目があります') +
+      '</span><span class="meta">要修正 ' + report.summary.errors + '件 / 要確認 ' + report.summary.warnings + '件</span>';
+    box.appendChild(verdict);
+
+    report.checks.forEach(function (check) {
+      var card = document.createElement('div');
+      card.className = 'chk-card ' + check.level;
+
+      var mark = document.createElement('span');
+      mark.className = 'chk-mark ' + check.level;
+      mark.textContent = LEVEL_LABEL[check.level] || check.level;
+
+      var body = document.createElement('div');
+      body.className = 'chk-body';
+      var title = document.createElement('b');
+      title.textContent = check.label;
+      body.appendChild(title);
+      body.appendChild(document.createTextNode(check.detail));
+
+      if (check.items && check.items.length) {
+        var list = document.createElement('ul');
+        list.className = 'chk-items';
+        check.items.forEach(function (item) {
+          var li = document.createElement('li');
+          li.textContent = item;
+          list.appendChild(li);
+        });
+        body.appendChild(list);
+      }
+
+      card.appendChild(mark);
+      card.appendChild(body);
+      box.appendChild(card);
+    });
+  }
+
+  /* ---------------------------------------------------------------- *
    * 初期化
    * ---------------------------------------------------------------- */
 
@@ -761,6 +834,10 @@
     var panes = document.querySelectorAll('.pane');
     for (var j = 0; j < panes.length; j++) panes[j].classList.toggle('active', panes[j].id === 'pane-' + name);
     if (name === 'sign') renderPreview();
+    if (name === 'preflight') {
+      var doc = activeDoc();
+      $('preflightDocName').textContent = doc ? doc.name : 'ファイル未選択';
+    }
   }
 
   function wire() {
@@ -826,6 +903,15 @@
     $('btnPickStamp').addEventListener('click', function () { run('画像を読み込んでいます...', pickStamp); });
     $('btnSignRun').addEventListener('click', function () { run('署名しています...', runSign); });
     $('btnVerify').addEventListener('click', function () { run('検証しています...', runVerify); });
+    $('btnPreflight').addEventListener('click', function () { run('点検しています...', runPreflight); });
+    $('btnPreflightOpen').addEventListener('click', function () {
+      run('読み込んで点検しています...', async function () {
+        var files = await window.kuro.openPdfs();
+        if (!files.length) return;
+        await addDocs(files);
+        await runPreflight();
+      });
+    });
     $('stampPage').addEventListener('change', function () { run('表示を更新しています...', renderPreview); });
     $('stampWidth').addEventListener('input', drawStampBox);
     $('previewStage').addEventListener('click', onPreviewClick);

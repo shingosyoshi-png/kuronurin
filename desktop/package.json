@@ -29,6 +29,7 @@
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "electron": "^44.3.0",
     "electron-builder": "^26.15.3",
     "pdfjs-dist": "3.11.174"

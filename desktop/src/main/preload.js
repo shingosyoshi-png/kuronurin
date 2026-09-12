@@ -31,6 +31,9 @@ contextBridge.exposeInMainWorld('kuro', {
   signPdf: (payload) => ipcRenderer.invoke('sign:sign', payload),
   inspectSignatures: (pdfBytes) => ipcRenderer.invoke('sign:inspect', pdfBytes),
 
+  // 提出前の点検
+  preflight: (pdfBytes) => ipcRenderer.invoke('preflight:inspect', pdfBytes),
+
   // 既定のアプリ設定
   openDefaultAppSettings: () => ipcRenderer.invoke('app:defaultAppSettings'),
 

@@ -11,6 +11,7 @@ const path = require('path');
 
 const rename = require('./rename.js');
 const sign = require('./sign.js');
+const preflight = require('./preflight.js');
 
 const isDev = process.argv.includes('--dev');
 let mainWindow = null;
@@ -361,6 +362,8 @@ function registerIpc() {
   ipcMain.handle('sign:inspect', (_event, pdfBytes) =>
     sign.listSignatures(Buffer.from(pdfBytes))
   );
+
+  ipcMain.handle('preflight:inspect', (_event, pdfBytes) => preflight.inspect(Buffer.from(pdfBytes)));
 
   ipcMain.handle('app:defaultAppSettings', () => openDefaultAppSettings());
 }
