@@ -1,0 +1,65 @@
+appId: jp.shingo-office.kuronurin
+productName: くろぬりんDesktop
+copyright: © 司法書士事務所LINK
+artifactName: kuronurin-desktop-${version}-${arch}.${ext}
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+  - '!**/*.map'
+  - '!.smoke'
+  - '!test'
+
+asar: true
+
+# PDFをこのアプリに関連付ける（「既定のアプリ」候補に出るようになる）
+fileAssociations:
+  - ext: pdf
+    name: PDF Document
+    description: PDF文書
+    mimeType: application/pdf
+    role: Editor
+    rank: Alternate
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # 配布するなら Apple Developer Program の署名＋公証（notarize）が必要
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  title: くろぬりんDesktop ${version}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+  # コード署名証明書がある場合は certificateFile / certificatePassword を環境変数で渡す
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: くろぬりんDesktop
+  # 拡張子の関連付けはインストーラーが登録する。既定アプリの切り替えはWindowsの設定画面で行う。
+
+linux:
+  target: [AppImage, deb]
+  category: Office
+  executableName: kuronurin-desktop
+  desktop:
+    entry:
+      MimeType: application/pdf
+      Categories: Office;Utility;

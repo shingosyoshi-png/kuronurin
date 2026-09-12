@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' blob: data:; worker-src 'self' blob:;">
+<title>くろぬりんDesktop</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-l">
+    <div class="logo"><span class="logo-i">PDF</span>くろぬりんDesktop</div>
+    <span class="ver" id="verBadge">v1.0.0</span>
+    <span class="offline">完全オフライン処理</span>
+  </div>
+  <div class="hdr-r">
+    <button class="hdr-btn" id="btnOpen">PDFを開く</button>
+    <button class="hdr-btn" id="btnDefaultApp">既定のPDFアプリにする</button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="tabs">
+    <button class="tab active" data-tab="split"><b>分割</b><span>ページを取り出す</span></button>
+    <button class="tab" data-tab="merge"><b>結合</b><span>複数PDFをまとめる</span></button>
+    <button class="tab" data-tab="rename"><b>リネーム</b><span>ファイル名を一括変更</span></button>
+    <button class="tab" data-tab="sign"><b>電子署名</b><span>署名の付与と検証</span></button>
+    <button class="tab" data-tab="preflight"><b>点検</b><span>提出前のチェック</span></button>
+  </nav>
+
+  <main class="main">
+
+    <!-- ================= 分割 ================= -->
+    <section class="pane active" id="pane-split">
+      <div class="pane-side">
+        <div class="card">
+          <h2>読み込んだPDF</h2>
+          <div class="file-list" id="splitFileList"><p class="empty">PDFを開いてください</p></div>
+          <button class="btn out" id="btnOpen2">PDFを追加</button>
+        </div>
+
+        <div class="card">
+          <h2>分割のしかた</h2>
+          <label class="radio"><input type="radio" name="splitMode" value="ranges" checked><span>ページ範囲を指定</span></label>
+          <input type="text" id="splitRanges" class="input" placeholder="例: 1-3,5,8-">
+          <label class="radio"><input type="radio" name="splitMode" value="every"><span>Nページごとに分ける</span></label>
+          <input type="number" id="splitEvery" class="input" value="1" min="1">
+          <label class="radio"><input type="radio" name="splitMode" value="single"><span>全ページを1枚ずつ</span></label>
+          <label class="radio"><input type="radio" name="splitMode" value="selection"><span>選択したページだけ抽出</span></label>
+        </div>
+
+        <div class="card">
+          <h2>出力</h2>
+          <label class="lbl">ファイル名テンプレート</label>
+          <input type="text" id="splitTemplate" class="input" value="{name}_{n}">
+          <p class="hint">使えるトークン: {name} 元のファイル名 / {n} 連番 / {pages} ページ範囲 / {date} 日付</p>
+          <label class="check"><input type="checkbox" id="splitStripMeta"><span>メタデータ（作成者など）を削除する</span></label>
+          <div class="dir-row">
+            <button class="btn out" id="btnSplitDir">保存先を選ぶ</button>
+            <span class="dir-path" id="splitDirLabel">未選択</span>
+          </div>
+          <button class="btn primary" id="btnSplitRun">分割して保存</button>
+        </div>
+
+        <div class="card">
+          <h2>ページ編集</h2>
+          <div class="btn-row">
+            <button class="btn out" id="btnRotateLeft">左に回転</button>
+            <button class="btn out" id="btnRotateRight">右に回転</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn out" id="btnDeletePages">選択ページを削除</button>
+            <button class="btn out" id="btnSaveEdited">名前を付けて保存</button>
+          </div>
+          <p class="hint">回転・削除はメモリ上のPDFに適用されます。保存するまで元ファイルは変わりません。</p>
+        </div>
+      </div>
+
+      <div class="pane-body">
+        <div class="body-head">
+          <span id="splitDocName">ファイル未選択</span>
+          <span class="spacer"></span>
+          <button class="chip" id="btnSelectAll">全選択</button>
+          <button class="chip" id="btnSelectNone">選択解除</button>
+        </div>
+        <div class="thumbs" id="thumbs"><p class="empty">PDFを開くとページがここに並びます</p></div>
+      </div>
+    </section>
+
+    <!-- ================= 結合 ================= -->
+    <section class="pane" id="pane-merge">
+      <div class="pane-side">
+        <div class="card">
+          <h2>結合するPDF</h2>
+          <p class="hint">上から順に結合されます。行をドラッグで並べ替えできます。</p>
+          <button class="btn out" id="btnMergeAdd">PDFを追加</button>
+          <label class="check"><input type="checkbox" id="mergeStripMeta"><span>メタデータを削除する</span></label>
+          <button class="btn primary" id="btnMergeRun">結合して保存</button>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="body-head"><span>結合順（ページ範囲は空欄なら全ページ）</span></div>
+        <div class="merge-list" id="mergeList"><p class="empty">PDFを追加してください</p></div>
+      </div>
+    </section>
+
+    <!-- ================= リネーム ================= -->
+    <section class="pane" id="pane-rename">
+      <div class="pane-side">
+        <div class="card">
+          <h2>対象ファイル</h2>
+          <button class="btn out" id="btnRenameAdd">ファイルを追加</button>
+          <button class="btn out" id="btnRenameClear">クリア</button>
+        </div>
+        <div class="card">
+          <h2>名前のルール</h2>
+          <label class="lbl">検索する文字</label>
+          <input type="text" id="renFind" class="input" placeholder="例: scan">
+          <label class="lbl">置き換える文字</label>
+          <input type="text" id="renReplace" class="input" placeholder="例: 原本">
+          <label class="check"><input type="checkbox" id="renRegex"><span>正規表現を使う</span></label>
+          <label class="check"><input type="checkbox" id="renCase"><span>大文字小文字を区別する</span></label>
+          <label class="lbl">ファイル名テンプレート</label>
+          <input type="text" id="renTemplate" class="input" value="{base}">
+          <p class="hint">{base} 置換後の名前 / {orig} 元の名前 / {n} 連番 / {date} 日付 / {yyyy}{mm}{dd} / {time} / {parent} 親フォルダ名</p>
+          <div class="grid3">
+            <div><label class="lbl">開始番号</label><input type="number" id="renStart" class="input" value="1"></div>
+            <div><label class="lbl">増分</label><input type="number" id="renStep" class="input" value="1"></div>
+            <div><label class="lbl">桁数</label><input type="number" id="renDigits" class="input" value="3" min="1" max="10"></div>
+          </div>
+          <label class="lbl">拡張子</label>
+          <select id="renExtCase" class="input">
+            <option value="keep">そのまま</option>
+            <option value="lower">小文字にする</option>
+            <option value="upper">大文字にする</option>
+          </select>
+          <label class="lbl">日付の基準</label>
+          <select id="renDateSource" class="input">
+            <option value="now">今日</option>
+            <option value="mtime">ファイルの更新日</option>
+          </select>
+        </div>
+        <div class="card">
+          <button class="btn primary" id="btnRenameRun">リネームを実行</button>
+          <button class="btn out" id="btnRenameUndo" disabled>直前のリネームを元に戻す</button>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="body-head"><span id="renameSummary">ファイルを追加すると変更後の名前がここに出ます</span></div>
+        <div class="table-wrap">
+          <table class="table" id="renameTable">
+            <thead><tr><th>状態</th><th>変更前</th><th>変更後</th><th>備考</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 電子署名 ================= -->
+    <section class="pane" id="pane-sign">
+      <div class="pane-side">
+        <div class="card">
+          <h2>1. 電子証明書</h2>
+          <button class="btn out" id="btnPickCert">証明書(.p12/.pfx)を選ぶ</button>
+          <span class="dir-path" id="certPath">未選択</span>
+          <label class="lbl">パスワード</label>
+          <input type="password" id="certPass" class="input" placeholder="証明書のパスワード">
+          <button class="btn out" id="btnCertCheck">証明書を確認</button>
+          <div class="cert-info" id="certInfo"></div>
+        </div>
+
+        <div class="card">
+          <h2>2. 署名の情報</h2>
+          <label class="lbl">署名者名</label>
+          <input type="text" id="signName" class="input" placeholder="証明書のCNを使う場合は空欄">
+          <label class="lbl">署名の理由</label>
+          <input type="text" id="signReason" class="input" value="内容を確認し、承認しました">
+          <label class="lbl">場所</label>
+          <input type="text" id="signLocation" class="input" placeholder="例: 静岡県富士市">
+          <label class="lbl">連絡先</label>
+          <input type="text" id="signContact" class="input" placeholder="例: 電話番号・メール">
+        </div>
+
+        <div class="card">
+          <h2>3. 印影（任意）</h2>
+          <button class="btn out" id="btnPickStamp">印影・サイン画像を選ぶ</button>
+          <span class="dir-path" id="stampPath">未選択</span>
+          <p class="hint">画像を選んだあと、右のプレビューをクリックすると貼り付け位置を決められます。</p>
+          <div class="grid3">
+            <div><label class="lbl">ページ</label><input type="number" id="stampPage" class="input" value="1" min="1"></div>
+            <div><label class="lbl">幅(pt)</label><input type="number" id="stampWidth" class="input" value="80" min="8"></div>
+            <div><label class="lbl">濃さ</label><input type="number" id="stampOpacity" class="input" value="1" min="0.1" max="1" step="0.1"></div>
+          </div>
+          <label class="check"><input type="checkbox" id="stampAsWidget" checked><span>1ページ目なら署名欄も同じ位置に置く</span></label>
+        </div>
+
+        <div class="card">
+          <button class="btn primary" id="btnSignRun">署名して保存</button>
+          <button class="btn out" id="btnVerify">この文書の署名を検証</button>
+          <p class="hint">署名は最後の工程です。署名後に分割・回転などを行うと署名は無効になります。</p>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="body-head">
+          <span id="signDocName">ファイル未選択</span>
+          <span class="spacer"></span>
+          <span class="hint" id="stampPosLabel"></span>
+        </div>
+        <div class="preview-wrap">
+          <div class="preview-stage" id="previewStage">
+            <canvas id="previewCanvas"></canvas>
+            <div class="stamp-box" id="stampBox" hidden></div>
+          </div>
+        </div>
+        <div class="sig-result" id="sigResult"></div>
+      </div>
+    </section>
+
+    <!-- ================= 点検 ================= -->
+    <section class="pane" id="pane-preflight">
+      <div class="pane-side">
+        <div class="card">
+          <h2>提出前の点検</h2>
+          <p class="hint">
+            相手方に渡す前・オンライン申請に添付する前に、差し戻しの原因になりやすい点をまとめて確認します。
+            ファイルは書き換えません。
+          </p>
+          <button class="btn primary" id="btnPreflight">この文書を点検</button>
+          <button class="btn out" id="btnPreflightOpen">別のPDFを開いて点検</button>
+        </div>
+        <div class="card">
+          <h2>点検する内容</h2>
+          <ul class="check-list">
+            <li>フォントがすべて埋め込まれているか</li>
+            <li>パスワード保護がかかっていないか</li>
+            <li>注釈・フォームが残っていないか</li>
+            <li>添付ファイル・JavaScriptが紛れていないか</li>
+            <li>ページサイズが揃っているか</li>
+            <li>作成者などのメタデータが残っていないか</li>
+            <li>電子署名の有無と検証結果</li>
+          </ul>
+          <p class="hint">
+            ここでの判定は一般的な注意点です。提出先ごとの要件（署名形式・用紙・様式）は各提出先の案内で確認してください。
+          </p>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="body-head">
+          <span id="preflightDocName">ファイル未選択</span>
+          <span class="spacer"></span>
+          <span class="hint" id="preflightSummary"></span>
+        </div>
+        <div class="report" id="preflightReport">
+          <p class="empty">PDFを開いて「この文書を点検」を押してください</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="overlay-box">
+    <div class="spinner"></div>
+    <p id="overlayText">処理中...</p>
+  </div>
+</div>
+
+<div class="drop-hint" id="dropHint" hidden><div>ここにPDFをドロップ</div></div>
+
+<script src="vendor/pdf.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="../shared/pdf-ops.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
